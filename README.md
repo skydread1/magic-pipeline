@@ -86,6 +86,15 @@ MAGIC is self-hosting: the compiler is Clojure code that emits CLR bytecode, and
 
 Practical consequence: `bb dev-runtime` does not need a bootstrap. Already-compiled `.clj.dll` files reference `Magic.Runtime.dll` and `Clojure.dll` by name and pick up new bodies at load time. Only `bb dev-compiler` (changes to compiler or stdlib `.clj` source) triggers the slow re-bootstrap path.
 
+### Refreshing the bootstrap binaries
+
+Two folders of pre-built binaries are tracked in git:
+
+- `nostrand/references/*.clj.dll`: the compiler Nostrand loads at startup
+- `magic-unity/Runtime/Infrastructure/Export/*.dll`: the prebuilt runtime that Unity loads at play time
+
+The `bb dev-*` tasks auto-revert any changes to these folders so day-to-day iteration commits stay clean. A maintainer refreshes them on purpose by running `bb build` and committing the result, usually after a batch of compiler or runtime fixes. A fresh clone runs the test suite without needing to build first.
+
 ### Common workflows
 
 ```bash
@@ -106,8 +115,8 @@ bb clean         # remove bin/ and bootstrap/
 ```bash
 bb clean
 bb build
-bb check-drift   # catches forgotten regen after .mustache edits
-bb test          # confirm 135 tests / 3 failures / 5 errors baseline (issue #237)
+bb check-drift
+bb test
 ```
 
 ### MSBuild targets (underlying)
