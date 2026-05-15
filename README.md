@@ -110,6 +110,21 @@ bb repl          # nostrand CLI REPL in magic-compiler/
 bb clean         # remove bin/ and bootstrap/
 ```
 
+### Inspecting the compiler pipeline
+
+For debugging the compiler itself, walk a form through the stages:
+
+```bash
+bb pipeline '(let [x 1] (+ x 1))'
+# Prints:
+#   FORM   (let [x 1] (+ x 1))
+#   AST (skeleton)  -- :let with an :intrinsic body
+#   SYMBOLIC IL (5 instructions)  -- linearised mage opcodes
+# Also dumps the full AST and symbolic IL as EDN to
+# magic-compiler/target/pipeline-ast.edn and pipeline-il.edn so you
+# can open them in Portal or any editor.
+```
+
 ### Before opening a PR
 
 ```bash

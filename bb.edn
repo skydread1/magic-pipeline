@@ -11,7 +11,8 @@
 {:min-bb-version "1.3.0"
 
  :tasks
- {:requires ([babashka.fs :as fs])
+ {:requires ([babashka.fs :as fs]
+             [clojure.string :as str])
 
   :init
   (do
@@ -29,7 +30,7 @@
    :task (when-not (fs/exists? nostrand-exe)
            (binding [*out* *err*]
              (println "Nostrand not built. Run `bb build` first (or `bb build-runtime` if everything else is current)."))
-           (System/exit 1))}
+           (throw (ex-info "nostrand not built" {:babashka/exit 1})))}
 
   -revert-byproducts
   {:doc "Revert build-byproduct DLLs so iteration commits stay clean. The nostrand/references/ and magic-unity/Runtime/Infrastructure/Export/ binaries are intentionally tracked but only updated via dedicated commits, not as side effects of every iteration."
@@ -77,7 +78,7 @@
    :task (let [generated-dir "magic-runtime/Magic.Runtime/Generated"
                {:keys [out]} (shell {:continue true :out :string}
                                     "git" "diff" "--" generated-dir)]
-           (when-not (clojure.string/blank? out)
+           (when-not (str/blank? out)
              (binding [*out* *err*]
                (println)
                (println "Drift detected in" generated-dir)
@@ -88,10 +89,10 @@
                (println "  git add" generated-dir)
                (println)
                (println "Diff (first 60 lines):")
-               (->> (clojure.string/split-lines out)
+               (->> (str/split-lines out)
                     (take 60)
                     (run! println)))
-             (System/exit 1)))}
+             (throw (ex-info "drift detected" {:babashka/exit 1}))))}
 
   ;; ============================================================
   ;; Test
@@ -120,6 +121,22 @@
    ;; but nos test/all loads compiler DLLs from nostrand/references/. Without
    ;; build-bootstrap copying them over, tests run the old compiler.
    :depends [build-magic build-bootstrap test -revert-byproducts]}
+
+  ;; ============================================================
+  ;; Inspect / debug
+  ;; ============================================================
+
+  pipeline
+  {:doc "Walk a Clojure form through reader -> AST -> symbolic IL. Prints form, AST skeleton, and flattened opcode listing; dumps full AST and IL as EDN to magic-compiler/target/ for downstream tools (Portal, editor)."
+   :depends [-check-nostrand]
+   :task (if (empty? *command-line-args*)
+           (do (binding [*out* *err*]
+                 (println "usage: bb pipeline '<clojure-form>'")
+                 (println "example: bb pipeline '(let [x 1] (+ x 1))'"))
+               (throw (ex-info "missing form" {:babashka/exit 1})))
+           (apply shell {:dir compiler-dir}
+                  "mono" (str "../" nostrand-exe)
+                  "pipeline/show" *command-line-args*))}
 
   ;; ============================================================
   ;; REPL
