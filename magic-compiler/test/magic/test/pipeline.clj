@@ -1,5 +1,6 @@
 (ns magic.test.pipeline
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.string :as str]
             [pipeline :as pipeline]
             [magic.analyzer :as ana]
             [magic.core :as magic]
@@ -126,15 +127,71 @@
     (System.IO.Directory/CreateDirectory d)
     d))
 
+(defn- file-in [dir name]
+  (System.IO.Path/Combine dir name))
+
 (deftest test-show-pipeline-writes-readable-edn
   (let [tmp (temp-dir)]
     (binding [*out* (System.IO.StringWriter.)]
-      (#'pipeline/show-pipeline '(let [x 1] (+ x 1)) tmp))
+      (#'pipeline/show-pipeline '(let [x 1] (+ x 1)) {:out tmp}))
     (testing "AST dump parses back via plain read-string"
-      (let [ast (read-string (slurp (str tmp "/pipeline-ast.edn")))]
+      (let [ast (read-string (slurp (file-in tmp "pipeline-ast.edn")))]
         (is (= :let (:op ast)))
         (is (= :intrinsic (:op (:body ast))))))
     (testing "IL dump parses back and contains opcode maps"
-      (let [il (read-string (slurp (str tmp "/pipeline-il.edn")))
+      (let [il (read-string (slurp (file-in tmp "pipeline-il.edn")))
             flat (#'pipeline/flatten-il il)]
         (is (pos? (count flat)))))))
+
+(deftest test-show-pipeline-sections-filters-dumps
+  (testing ":sections #{:ast-edn} writes only the AST file"
+    (let [tmp (temp-dir)]
+      (binding [*out* (System.IO.StringWriter.)]
+        (#'pipeline/show-pipeline '(let [x 1] x)
+                                  {:out tmp :sections #{:ast-edn}}))
+      (is      (System.IO.File/Exists (file-in tmp "pipeline-ast.edn")))
+      (is (not (System.IO.File/Exists (file-in tmp "pipeline-il.edn"))))
+      (is (not (System.IO.File/Exists (file-in tmp "pipeline-il-tree.edn"))))))
+  (testing ":sections #{:il-edn :tree-edn} writes IL and tree, skips AST"
+    (let [tmp (temp-dir)]
+      (binding [*out* (System.IO.StringWriter.)]
+        (#'pipeline/show-pipeline '(let [x 1] x)
+                                  {:out tmp :sections #{:il-edn :tree-edn}}))
+      (is (not (System.IO.File/Exists (file-in tmp "pipeline-ast.edn"))))
+      (is      (System.IO.File/Exists (file-in tmp "pipeline-il.edn")))
+      (is      (System.IO.File/Exists (file-in tmp "pipeline-il-tree.edn"))))))
+
+(deftest test-show-pipeline-sections-filters-stdout
+  (testing ":sections #{:il} prints only the SYMBOLIC IL banner"
+    ;; `when-let` expands, so MACROEXPAND would normally print --
+    ;; verifying it does NOT appear here actually tests the section filter.
+    (let [out (with-out-str
+                (#'pipeline/show-pipeline '(when-let [x 1] x)
+                                          {:sections #{:il}}))]
+      (is      (str/includes? out "SYMBOLIC IL"))
+      (is (not (str/includes? out "FORM   ")))
+      (is (not (str/includes? out "AST (skeleton)")))
+      (is (not (str/includes? out "TYPES (")))
+      (is (not (str/includes? out "MACROEXPAND")))
+      (is (not (str/includes? out "EDN dumps"))))))
+
+(deftest test-parse-args
+  (testing "single form arg, no options"
+    (let [[form opts] (#'pipeline/parse-args '((let [x 1] x)))]
+      (is (= '(let [x 1] x) form))
+      (is (= {} opts))))
+  (testing "form plus :key value pairs"
+    (let [[form opts] (#'pipeline/parse-args
+                       '((let [x 1] x) :out tmp :sections #{:il}))]
+      (is (= '(let [x 1] x) form))
+      (is (= 'tmp (:out opts)))
+      (is (= #{:il} (:sections opts)))))
+  (testing "odd number of option tokens throws"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (#'pipeline/parse-args '((form) :out))))))
+
+(deftest test-coerce-form
+  (testing "string is read into a form"
+    (is (= '(+ 1 2) (#'pipeline/coerce-form "(+ 1 2)"))))
+  (testing "non-string value passes through unchanged"
+    (is (= '(+ 1 2) (#'pipeline/coerce-form '(+ 1 2))))))

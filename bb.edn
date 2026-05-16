@@ -127,12 +127,15 @@
   ;; ============================================================
 
   pipeline
-  {:doc "Walk a Clojure form through reader -> AST -> symbolic IL. Prints form, AST skeleton, and flattened opcode listing; dumps full AST and IL as EDN to magic-compiler/target/ for downstream tools (Portal, editor)."
+  {:doc "Walk a Clojure form through reader -> AST -> symbolic IL. Prints form, macroexpand, AST skeleton, type summary, and flattened opcode listing; dumps EDN to <out>/ (default magic-compiler/target). Options: :out <dir>, :sections '#{...}' subset of #{:form :macroexpand :ast :types :il :ast-edn :il-edn :tree-edn}."
    :depends [-check-nostrand]
    :task (if (empty? *command-line-args*)
            (do (binding [*out* *err*]
-                 (println "usage: bb pipeline '<clojure-form>'")
-                 (println "example: bb pipeline '(let [x 1] (+ x 1))'"))
+                 (println "usage: bb pipeline '<form>' [:key value]...")
+                 (println "examples:")
+                 (println "  bb pipeline '(let [x 1] (+ x 1))'")
+                 (println "  bb pipeline '(let [x 1] x)' :out /tmp/x")
+                 (println "  bb pipeline '(let [x 1] x)' :sections '#{:ast :il}'"))
                (throw (ex-info "missing form" {:babashka/exit 1})))
            (apply shell {:dir compiler-dir}
                   "mono" (str "../" nostrand-exe)
