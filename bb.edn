@@ -61,8 +61,8 @@
            (shell {:dir compiler-dir} "mono" (str "../" nostrand-exe) "build/bootstrap"))}
 
   build-bootstrap
-  {:doc "After build-magic, copy new compiler DLLs into nostrand/references and rebuild nostrand."
-   :task (shell "dotnet build -t:Bootstrap")}
+  {:doc "After build-magic, deploy bootstrap DLLs into nostrand/references (rebuilds nostrand) and into magic-unity Runtime/Infrastructure/Export."
+   :task (shell "dotnet build -t:Bootstrap;MagicUnity")}
 
   ;; ============================================================
   ;; Codegen

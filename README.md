@@ -93,7 +93,7 @@ Two folders of pre-built binaries are tracked in git:
 - `nostrand/references/*.clj.dll`: the compiler Nostrand loads at startup
 - `magic-unity/Runtime/Infrastructure/Export/*.dll`: the prebuilt runtime that Unity loads at play time
 
-The `bb dev-*` tasks auto-revert any changes to these folders so day-to-day iteration commits stay clean. A maintainer refreshes them on purpose by running `bb build` and committing the result, usually after a batch of compiler or runtime fixes. A fresh clone runs the test suite without needing to build first.
+The `bb dev-*` tasks auto-revert any changes to these folders so day-to-day iteration commits stay clean. A maintainer refreshes them on purpose, usually after a batch of compiler or runtime fixes, by running either `bb build` (full path) or `bb build-magic` followed by `bb build-bootstrap` (faster: bootstrap + deploy). Both paths refresh `nostrand/references/` and `magic-unity/Runtime/Infrastructure/Export/` together. A fresh clone runs the test suite without needing to build first.
 
 ### Common workflows
 
